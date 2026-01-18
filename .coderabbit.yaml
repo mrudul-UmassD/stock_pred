@@ -1,0 +1,49 @@
+# CodeRabbit Configuration
+
+# Enable CodeRabbit AI code reviews
+reviews:
+  # Review all pull requests
+  auto_review:
+    enabled: true
+    
+  # Review settings
+  request_changes_workflow: true
+  
+  # Code quality checks
+  high_level_summary: true
+  poem: false
+  review_status: true
+  
+  # Security and best practices
+  path_filters:
+    - "**/*.py"
+    - "**/*.ts"
+    - "**/*.tsx"
+    - "**/*.js"
+    - "**/*.jsx"
+  
+  # Ignore patterns
+  path_instructions:
+    - path: "**/*.md"
+      instructions: "Focus on clarity and completeness"
+    - path: "backend/**/*.py"
+      instructions: "Check for type hints, docstrings, error handling, and data leakage prevention"
+    - path: "frontend/**/*.tsx"
+      instructions: "Check for TypeScript types, proper error handling, and accessibility"
+    - path: "notebooks/**"
+      instructions: "Review for data leakage, proper validation, and clear documentation"
+
+# Language-specific settings
+language_settings:
+  python:
+    style_guide: "PEP 8"
+    check_type_hints: true
+    check_docstrings: true
+    
+  typescript:
+    strict_mode: true
+    no_any: true
+
+# PR summary settings
+chat:
+  auto_reply: false
