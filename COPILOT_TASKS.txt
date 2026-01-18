@@ -1,0 +1,226 @@
+========================
+PROJECT: stock-predict-live
+GOAL: Real-time US stock prediction dashboard
+STACK: Jupyter Notebook (training), FastAPI backend (serving + SSE), Next.js frontend (live UI), SQLite storage
+REVIEW: All code must be PR-friendly and pass CodeRabbit review. Use typing, docstrings, clean structure.
+DATA SOURCES: yfinance (primary), Stooq CSV fallback (market), FRED via fredapi (macro).
+========================
+
+TASK 0 - REPO SCAFFOLD (DO THIS FIRST)
+Prompt:
+Create the initial repository structure and minimal files.
+
+Requirements:
+- Create folders:
+  notebooks/, artifacts/, backend/, backend/app/, backend/app/services/, backend/scripts/, frontend/, db/, .github/
+- Add README.md with placeholder sections: Setup, Data Sources, Training, Serving, Frontend, Streaming, Troubleshooting.
+- Add CONTRIBUTING.md stating all PRs must address CodeRabbit comments before merge.
+- Add .github/pull_request_template.md with checklist (tests, lint, security, no data leakage, docs updated).
+- Add .gitignore for Python, Node, Jupyter, venv, artifacts outputs.
+- Do not write the full implementation yet.
+
+Acceptance Criteria:
+- Repo tree exists.
+- README/CONTRIBUTING/PR template exist and are coherent.
+
+
+TASK 1 - NOTEBOOK: TRAINING SKELETON
+Prompt:
+Create notebooks/train.ipynb with markdown + code cells skeleton only (no heavy training yet).
+
+Requirements:
+- Sections: Imports, Config, Data Ingestion (yfinance + FRED placeholders), Feature Engineering placeholders, Labeling placeholders, Walk-forward validation placeholders, Model training placeholders, Export artifacts.
+- Notebook must save artifacts:
+  artifacts/model.bin (placeholder until trained)
+  artifacts/feature_schema.json
+  artifacts/model_meta.json (model_version, created_at, tickers, horizons, thresholds)
+- Add a clear markdown section explaining data leakage prevention.
+
+Acceptance Criteria:
+- Notebook runs top-to-bottom with placeholder outputs (even if model not trained yet).
+- Artifact files are created as dummy placeholders.
+
+
+TASK 2 - BACKEND: FASTAPI MINIMAL APP + DB
+Prompt:
+Implement a minimal FastAPI backend that can read/write predictions in SQLite.
+
+Requirements:
+- backend/app/main.py creates FastAPI app with CORS enabled for localhost frontend.
+- backend/app/db.py contains SQLite connection helpers.
+- Create schema migration on startup:
+  table predictions(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts TEXT NOT NULL,
+    ticker TEXT NOT NULL,
+    horizon INTEGER NOT NULL,
+    direction TEXT NOT NULL,
+    prob_up REAL,
+    prob_down REAL,
+    prob_flat REAL,
+    expected_return REAL,
+    model_version TEXT
+  )
+- Add endpoint:
+  GET /health -> returns {status, time, db_ok, model_version(if exists)}
+- Add endpoint:
+  GET /api/tickers -> returns distinct tickers from db (empty list ok)
+
+Acceptance Criteria:
+- `uvicorn backend.app.main:app --reload` runs.
+- /health works.
+- SQLite db created in db/predictions.db.
+
+
+TASK 3 - BACKEND: DATA SOURCES MODULE (YFINANCE + STOOQ + FRED)
+Prompt:
+Create backend/app/services/data_sources.py with functions to fetch data.
+
+Requirements:
+- fetch_yfinance_ohlcv(ticker, start, end, interval="1d") -> dataframe with Date index and OHLCV columns.
+- fetch_stooq_ohlcv(ticker, start, end) -> dataframe from Stooq CSV (daily).
+- fetch_fred_series(series_ids: list, start, end) -> dataframe (date index).
+- Add robust error handling and logging.
+- No model logic in this file.
+
+Acceptance Criteria:
+- Functions return pandas dataframes with consistent columns.
+- If yfinance fails, stooq fetch can be called separately.
+
+
+TASK 4 - BACKEND: FEATURE ENGINEERING MODULE
+Prompt:
+Create backend/app/services/features.py to compute features consistently.
+
+Requirements:
+- compute_technical_features(df_ohlcv) -> dataframe features:
+  returns, log_returns, rolling_mean_5/20, rolling_vol_20, RSI_14, MACD, Bollinger band width.
+- align_macro_features(features_df, macro_df) -> join macro series; forward-fill only past values (no future leak).
+- create_feature_matrix(ohlcv_df, macro_df) -> final X matrix, with stable column order.
+
+Acceptance Criteria:
+- Produces a feature df with no NaNs at the end rows after dropping warmup periods.
+- Column names are stable and saved in feature_schema.json format.
+
+
+TASK 5 - BACKEND: INFERENCE MODULE (LOAD ARTIFACTS + PREDICT)
+Prompt:
+Create backend/app/services/inference.py to load model and produce predictions.
+
+Requirements:
+- load_artifacts() reads artifacts/model.bin, feature_schema.json, model_meta.json.
+- predict_for_ticker(ticker, horizon) returns:
+  direction, prob_up, prob_down, prob_flat, expected_return
+- If artifacts missing, raise a friendly error.
+
+Acceptance Criteria:
+- Calling predict_for_ticker works once a real model exists.
+- For now, allow a fallback "dummy model" mode that returns neutral predictions if model missing (only for dev).
+
+
+TASK 6 - BACKEND: PREDICTION RUNNER SCRIPT
+Prompt:
+Implement backend/scripts/predict.py which:
+- Loads artifacts
+- Pulls latest data for configured tickers (from model_meta.json)
+- Pulls macro data from FRED
+- Builds features
+- Runs predictions for horizons [1,5,20]
+- Inserts rows into SQLite predictions table
+- Logs summary: rows inserted, runtime, last timestamp
+
+Acceptance Criteria:
+- Running `python backend/scripts/predict.py` inserts rows in db (dummy ok until trained).
+- No crashes when DB already exists.
+
+
+TASK 7 - BACKEND: API ENDPOINTS FOR UI
+Prompt:
+Add backend/app/routes.py with endpoints:
+- GET /api/predictions/overview?horizon=5&limit=200
+- GET /api/predictions/latest?ticker=SPY&horizon=5
+- GET /api/predictions/history?ticker=SPY&horizon=5&limit=500
+
+Return JSON with timestamps and values. Validate inputs.
+
+Acceptance Criteria:
+- Endpoints return correct data from SQLite.
+- Proper HTTP 400 for invalid inputs.
+
+
+TASK 8 - BACKEND: REAL-TIME STREAMING VIA SSE
+Prompt:
+Implement SSE endpoint in backend/app/stream.py and wire it in main.py:
+- GET /api/stream?horizon=5
+- Every 2 seconds, query latest overview predictions and emit as SSE event "overview".
+- Use proper SSE headers and keepalive.
+
+Acceptance Criteria:
+- Browser/EventSource can connect and receive events continuously.
+- Connection closes cleanly.
+
+
+TASK 9 - FRONTEND: NEXT.JS SCAFFOLD + OVERVIEW PAGE
+Prompt:
+Create Next.js (TypeScript) frontend in /frontend:
+- Tailwind configured
+- Page / shows overview table
+- Fetch initial data from backend /api/predictions/overview
+- Add filters: horizon dropdown (1/5/20), search ticker, probability threshold slider (optional)
+- Style it like a clean dashboard.
+
+Acceptance Criteria:
+- `npm run dev` works.
+- Overview table renders from backend data.
+
+
+TASK 10 - FRONTEND: LIVE UPDATES (SSE CLIENT)
+Prompt:
+Add SSE live updates to the overview page:
+- Use EventSource to connect to backend /api/stream?horizon=selected
+- Update rows when events arrive (merge by ticker+horizon)
+- Show “Last updated” timestamp and live indicator.
+
+Acceptance Criteria:
+- UI updates without refresh when backend emits SSE.
+- Switching horizon reconnects SSE.
+
+
+TASK 11 - FRONTEND: TICKER DETAIL PAGE
+Prompt:
+Add /ticker/[symbol] page:
+- Fetch latest + history from backend
+- Show charts (Recharts): prob_up over time, expected_return over time
+- Show recent predictions table.
+
+Acceptance Criteria:
+- Detail page loads for a symbol from overview.
+- Charts render without errors.
+
+
+TASK 12 - FRONTEND: HEALTH PAGE
+Prompt:
+Add /health page:
+- Call backend /health
+- Show db_ok, model_version, server time
+- Show data freshness hint (latest ts in predictions table via an endpoint if needed)
+
+Acceptance Criteria:
+- Health page renders and reflects backend status.
+
+
+TASK 13 - NOTEBOOK: REAL TRAINING IMPLEMENTATION (FINAL)
+Prompt:
+Now replace placeholders in notebooks/train.ipynb:
+- Pull tickers list (S&P 500 from Wikipedia or a fixed list)
+- Pull OHLCV (yfinance) for each ticker
+- Pull macro data (FRED)
+- Build features and labels (direction classification)
+- Use walk-forward validation (time-series safe)
+- Train XGBoost classifier
+- Export artifacts: model.bin, feature_schema.json, model_meta.json with tickers/horizons/thresholds
+
+Acceptance Criteria:
+- Notebook runs successfully.
+- Model artifacts are real and inference works.
+- backend/scripts/predict.py generates non-dummy predictions.

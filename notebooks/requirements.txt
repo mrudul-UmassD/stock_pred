@@ -1,0 +1,22 @@
+# Notebook Training Dependencies
+
+# Data Sources
+yfinance==0.2.48
+fredapi==0.5.2
+requests==2.32.3
+
+# Data Processing
+pandas==2.2.3
+numpy==2.1.2
+
+# Machine Learning
+scikit-learn==1.5.2
+xgboost==2.1.2
+statsmodels==0.14.4
+
+# Visualization
+matplotlib==3.9.2
+
+# Jupyter
+jupyter==1.1.1
+ipykernel==6.29.5

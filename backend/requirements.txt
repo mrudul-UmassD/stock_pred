@@ -1,0 +1,27 @@
+# Backend Python Dependencies
+
+# Web Framework
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+pydantic==2.9.0
+python-multipart==0.0.12
+
+# Data Sources
+yfinance==0.2.48
+fredapi==0.5.2
+requests==2.32.3
+
+# Data Processing
+pandas==2.2.3
+numpy==2.1.2
+
+# Machine Learning
+scikit-learn==1.5.2
+xgboost==2.1.2
+statsmodels==0.14.4
+
+# Database
+aiosqlite==0.20.0
+
+# Utilities
+python-dotenv==1.0.1

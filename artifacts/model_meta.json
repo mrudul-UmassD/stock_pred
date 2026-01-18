@@ -1,0 +1,13 @@
+{
+  "model_version": "v1.0_placeholder_20260118",
+  "created_at": "2026-01-18T00:00:00",
+  "tickers": ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NVDA", "JPM", "V", "JNJ"],
+  "horizons": [1, 5, 20],
+  "thresholds": {
+    "up": 0.02,
+    "down": -0.02
+  },
+  "model_type": "XGBClassifier",
+  "num_features": 23,
+  "status": "placeholder_until_trained"
+}
