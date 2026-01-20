@@ -231,7 +231,7 @@ def compute_market_regime_features(
 
 def compute_technical_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute all technical indicators.
+    Compute all technical indicators matching training feature names.
     
     Args:
         df: DataFrame with OHLCV data
@@ -243,17 +243,40 @@ def compute_technical_features(df: pd.DataFrame) -> pd.DataFrame:
     
     df = df.copy()
     
-    # Returns
+    # Returns (using consistent names with training)
     df = compute_returns(df)
+    df['returns_1d'] = df['return_1d']  # Alias for consistency
+    df['returns_5d'] = df['close'].pct_change(5)
+    df['returns_20d'] = df['close'].pct_change(20)
+    
+    # Volume features
+    df['volume_change'] = df['volume'].pct_change()
+    df['volume_ma_20'] = df['volume'].rolling(window=20).mean()
+    df['volume_ma_ratio'] = df['volume'] / df['volume_ma_20']
     
     # Rolling statistics
     df = compute_rolling_statistics(df, windows=[5, 20, 60])
+    df['ma_5'] = df['sma_5']  # Alias for consistency
+    df['ma_20'] = df['sma_20']  # Alias for consistency
+    df['ma_ratio'] = df['ma_5'] / df['ma_20']
     
     # Technical indicators
-    df = compute_rsi(df, period=14)
-    df = compute_macd(df)
-    df = compute_bollinger_bands(df, period=20)
-    df = compute_atr(df, period=14)
+    rsi_df = compute_rsi(df, period=14)
+    df['rsi_14'] = rsi_df['rsi_14']
+    
+    macd_df = compute_macd(df)
+    df['macd'] = macd_df['macd']
+    df['macd_signal'] = macd_df['macd_signal']
+    
+    bb_df = compute_bollinger_bands(df, period=20)
+    df['bb_upper'] = bb_df['bb_upper']
+    df['bb_lower'] = bb_df['bb_lower']
+    df['bb_middle'] = bb_df['bb_middle']
+    df['bb_position'] = (df['close'] - df['bb_lower']) / (df['bb_upper'] - df['bb_lower'])
+    
+    atr_df = compute_atr(df, period=14)
+    df['atr_14'] = atr_df['atr_14']
+    df['atr_ratio'] = df['atr_14'] / df['close']
     
     # Market regime
     df = compute_market_regime_features(df, windows=[20, 60])

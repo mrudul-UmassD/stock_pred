@@ -138,6 +138,18 @@ def predict_for_ticker(
                 logger.error(f"Model not loaded, cannot predict for {ticker}")
                 return None
         
+        # Get model for specific horizon (models are stored as dict per horizon)
+        if isinstance(model, dict):
+            horizon_model = model.get(horizon)
+            if horizon_model is None:
+                logger.error(f"No model found for horizon {horizon}")
+                if use_dummy_if_missing:
+                    return get_dummy_prediction()
+                return None
+        else:
+            # Single model for all horizons (legacy)
+            horizon_model = model
+        
         # Validate horizon
         if model_meta and 'horizons' in model_meta:
             if horizon not in model_meta['horizons']:
@@ -170,8 +182,8 @@ def predict_for_ticker(
             X = latest_features.select_dtypes(include=[np.number]).values
         
         # Make prediction
-        proba = model.predict_proba(X)[0]
-        pred_class = model.predict(X)[0]
+        proba = horizon_model.predict_proba(X)[0]
+        pred_class = horizon_model.predict(X)[0]
         
         # Map class to direction (assumes classes are 0=down, 1=flat, 2=up)
         class_to_direction = {0: 'down', 1: 'flat', 2: 'up'}
