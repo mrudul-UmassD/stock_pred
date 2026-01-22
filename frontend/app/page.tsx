@@ -105,8 +105,20 @@ export default function Home() {
             </h1>
             <div className="flex gap-4">
               <Link
+                href="/stocks"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                All Stocks
+              </Link>
+              <Link
+                href="/ipos"
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                Upcoming IPOs
+              </Link>
+              <Link
                 href="/health"
-                className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white flex items-center"
               >
                 System Health
               </Link>

@@ -209,3 +209,153 @@ async def get_prediction_history(
     except Exception as e:
         logger.error(f"Error fetching prediction history: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/universe/tickers")
+async def get_ticker_universe(
+    universe: str = Query("sp500", description="Universe type: sp500, nasdaq100, all")
+):
+    """
+    Get list of tickers in specified universe.
+    
+    Args:
+        universe: Universe type (sp500, nasdaq100, all)
+        
+    Returns:
+        List of ticker symbols
+    """
+    try:
+        from .services.market_data import get_market_universe
+        
+        tickers = get_market_universe(universe)
+        
+        return {
+            "universe": universe,
+            "count": len(tickers),
+            "tickers": tickers
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching ticker universe: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/ipos/upcoming")
+async def get_upcoming_ipos(
+    days_ahead: int = Query(7, ge=1, le=30, description="Days to look ahead")
+):
+    """
+    Get upcoming IPOs for the next N days.
+    
+    Args:
+        days_ahead: Number of days to look ahead
+        
+    Returns:
+        List of upcoming IPOs with profitability predictions
+    """
+    try:
+        from .services.market_data import get_upcoming_ipos, predict_ipo_profitability
+        
+        ipos = get_upcoming_ipos(days_ahead)
+        
+        # Add profitability predictions
+        for ipo in ipos:
+            prediction = predict_ipo_profitability(ipo)
+            ipo['profitability'] = prediction
+        
+        # Sort by profitability score (highest first)
+        ipos.sort(key=lambda x: x['profitability']['score'], reverse=True)
+        
+        return {
+            "days_ahead": days_ahead,
+            "count": len(ipos),
+            "ipos": ipos
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching IPOs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/predictions/all")
+async def get_all_predictions(
+    horizon: int = Query(5, description="Prediction horizon (1, 5, or 20 days)"),
+    sort_by: str = Query("prob_up", description="Sort field: prob_up, prob_down, ticker, expected_return"),
+    order: str = Query("desc", description="Sort order: asc or desc"),
+    limit: int = Query(500, ge=1, le=5000, description="Maximum number of results")
+):
+    """
+    Get all latest predictions with sorting.
+    
+    Args:
+        horizon: Prediction horizon (1, 5, or 20)
+        sort_by: Field to sort by
+        order: Sort order (asc/desc)
+        limit: Maximum results
+        
+    Returns:
+        Sorted list of predictions
+    """
+    try:
+        # Validate inputs
+        if horizon not in [1, 5, 20]:
+            raise HTTPException(status_code=400, detail="Horizon must be 1, 5, or 20")
+        
+        valid_sort_fields = ['prob_up', 'prob_down', 'prob_flat', 'ticker', 'expected_return', 'ts']
+        if sort_by not in valid_sort_fields:
+            raise HTTPException(status_code=400, detail=f"Invalid sort field. Must be one of: {valid_sort_fields}")
+        
+        if order not in ['asc', 'desc']:
+            raise HTTPException(status_code=400, detail="Order must be 'asc' or 'desc'")
+        
+        conn = sqlite3.connect(get_db_path())
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Get latest prediction for each ticker
+        query = f"""
+            WITH LatestPredictions AS (
+                SELECT 
+                    ticker,
+                    MAX(ts) as latest_ts
+                FROM predictions
+                WHERE horizon = ?
+                GROUP BY ticker
+            )
+            SELECT 
+                p.ts,
+                p.ticker,
+                p.horizon,
+                p.direction,
+                p.prob_up,
+                p.prob_down,
+                p.prob_flat,
+                p.expected_return,
+                p.model_version
+            FROM predictions p
+            INNER JOIN LatestPredictions lp 
+                ON p.ticker = lp.ticker AND p.ts = lp.latest_ts
+            WHERE p.horizon = ?
+            ORDER BY p.{sort_by} {order.upper()}
+            LIMIT ?
+        """
+        
+        cursor.execute(query, (horizon, horizon, limit))
+        rows = cursor.fetchall()
+        conn.close()
+        
+        predictions = [dict(row) for row in rows]
+        
+        return {
+            "horizon": horizon,
+            "sort_by": sort_by,
+            "order": order,
+            "count": len(predictions),
+            "predictions": predictions
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching all predictions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
