@@ -101,7 +101,7 @@ export default function IPOsPage() {
               Track and analyze upcoming initial public offerings
             </p>
           </div>
-          <LiveIndicator />
+          <LiveIndicator isLive={false} />
         </div>
 
         {/* Controls */}

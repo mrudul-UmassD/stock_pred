@@ -86,7 +86,7 @@ export default function AllStocksPage() {
               Predictions for {predictions.length} stocks
             </p>
           </div>
-          <LiveIndicator />
+          <LiveIndicator isLive={false} />
         </div>
 
         {/* Controls */}
